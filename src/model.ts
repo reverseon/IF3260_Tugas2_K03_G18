@@ -1,15 +1,18 @@
 import {Point, Shape, Vertex, Color} from "./lib/baseClass";
 import {createProgramFromShaderSources, m4util} from "./lib/util";
-
 class ZeroHollow extends Shape {
-    startingPoint: Point;
-    dx: number;
-    dy: number;
-    dz: number;
-    thick: number;
-    color: number[] = [0.0, 0.0, 0.0, 1.0];
-    pointIndex: Point[] = new Array(16);
-    constructor(gl: WebGLRenderingContext, sp: Point, dx: number, dy: number, dz: number, thick: number) {
+    startingPoint: Point = new Point(0, 0, 0, 1);
+    dx: number = 0;
+    dy: number = 0;
+    dz: number = 0;
+    thick: number = 0;
+
+    rotxrad: number = 0;
+    rotyrad: number = 0;
+    rotzrad: number = 0;
+    vertices: Vertex[] = [];
+
+    constructor(gl: WebGLRenderingContext) {
         const vertexShaderSource = `
             attribute vec4 a_position;
             attribute vec4 a_color;
@@ -34,82 +37,21 @@ class ZeroHollow extends Shape {
                 fragmentShaderSource
             )!
         );
-        this.startingPoint = sp;
-        this.dx = dx;
-        this.dy = dy;
-        this.dz = dz;
-        this.thick = thick;
     }
-    private updatePointIndex(): void {
-        const sx = this.startingPoint.x;
-        const sy = this.startingPoint.y;
-        const sz = this.startingPoint.z;
-        const dx = this.dx;
-        const dy = this.dy;
-        const dz = this.dz;
-        const t = this.thick;
-        this.pointIndex[0] = new Point(sx, sy, sz, 1);
-        this.pointIndex[1] = new Point(sx + dx, sy, sz, 1);
-        this.pointIndex[2] = new Point(sx + dx, sy + dy, sz, 1);
-        this.pointIndex[3] = new Point(sx, sy + dy, sz, 1);
-        this.pointIndex[4] = new Point(sx + t, sy + t, sz, 1);
-        this.pointIndex[5] = new Point(sx + dx - t, sy + t, sz, 1);
-        this.pointIndex[6] = new Point(sx + dx - t, sy + dy - t, sz, 1);
-        this.pointIndex[7] = new Point(sx + t, sy + dy - t, sz, 1);
-        this.pointIndex[8] = new Point(sx, sy, sz + dz, 1);
-        this.pointIndex[9] = new Point(sx + dx, sy, sz + dz, 1);
-        this.pointIndex[10] = new Point(sx + dx, sy + dy, sz + dz, 1);
-        this.pointIndex[11] = new Point(sx, sy + dy, sz + dz, 1);
-        this.pointIndex[12] = new Point(sx + t, sy + t, sz + dz, 1);
-        this.pointIndex[13] = new Point(sx + dx - t, sy + t, sz + dz, 1);
-        this.pointIndex[14] = new Point(sx + dx - t, sy + dy - t, sz + dz, 1);
-        this.pointIndex[15] = new Point(sx + t, sy + dy - t, sz + dz, 1);
-    }
-    private createRenderedVertices(): Vertex[] {
-        this.updatePointIndex();
-        const leftFrontColor = new Color(0, 1, 0, 1);
-        const leftFront: Vertex[] = [
-            new Vertex(this.pointIndex[0], leftFrontColor),
-            new Vertex(this.pointIndex[4], leftFrontColor),
-            new Vertex(this.pointIndex[7], leftFrontColor),
-            new Vertex(this.pointIndex[0], leftFrontColor),
-            new Vertex(this.pointIndex[7], leftFrontColor),
-            new Vertex(this.pointIndex[3], leftFrontColor),
-        ]
-        const rightFrontColor = new Color(1, 1, 0, 1);
-        const rightFront: Vertex[] = [
-            new Vertex(this.pointIndex[1], rightFrontColor),
-            new Vertex(this.pointIndex[2], rightFrontColor),
-            new Vertex(this.pointIndex[6], rightFrontColor),
-            new Vertex(this.pointIndex[1], rightFrontColor),
-            new Vertex(this.pointIndex[6], rightFrontColor),
-            new Vertex(this.pointIndex[5], rightFrontColor),
-        ]
-        const upFrontColor = new Color(0, 1, 1, 1);
-        const upFront: Vertex[] = [
-            new Vertex(this.pointIndex[2], upFrontColor),
-            new Vertex(this.pointIndex[3], upFrontColor),
-            new Vertex(this.pointIndex[7], upFrontColor),
-            new Vertex(this.pointIndex[2], upFrontColor),
-            new Vertex(this.pointIndex[7], upFrontColor),
-            new Vertex(this.pointIndex[6], upFrontColor),
-        ]
-        const downFrontColor = new Color(0, 0, 1, 1);
-        const downFront: Vertex[] = [
-            new Vertex(this.pointIndex[0], downFrontColor),
-            new Vertex(this.pointIndex[1], downFrontColor),
-            new Vertex(this.pointIndex[5], downFrontColor),
-            new Vertex(this.pointIndex[0], downFrontColor),
-            new Vertex(this.pointIndex[5], downFrontColor),
-            new Vertex(this.pointIndex[4], downFrontColor),
-        ]
-        // to do: add middle side and back side
-        return [
-            ...leftFront,
-            ...rightFront,
-            ...upFront,
-            ...downFront,
-        ]
+    async loadfile() {
+        const response = await fetch(require("./base/zerohollow.json"));
+        const json = await response.json();
+        this.vertices = json.vertices.map((v: any) => {
+            return new Vertex(
+                new Point(v.position.x, v.position.y, v.position.z, v.position.w),
+                new Color(v.color.r, v.color.g, v.color.b, v.color.a)
+            )
+        })
+        this.startingPoint = new Point(json.info.sx, json.info.sy, json.info.sz, 1);
+        this.dx = json.info.dx
+        this.dy = json.info.dy
+        this.dz = json.info.dz
+        this.thick = json.info.t
     }
     private verticesToF32ArrayPoint(vertices: Vertex[]): Float32Array {
         const f32Array = new Float32Array(vertices.length * 4);
@@ -135,15 +77,13 @@ class ZeroHollow extends Shape {
     }
     draw(gl: WebGLRenderingContext): void {
         gl.useProgram(this.program);
-        console.log("here")
         let positionAttributeLocation = gl.getAttribLocation(this.program, "a_position");
         let colorAttributeLocation = gl.getAttribLocation(this.program, "a_color");
         let uMatrixLocation = gl.getUniformLocation(this.program, "u_matrix");
         let positionBuffer = gl.createBuffer();
         let colorBuffer = gl.createBuffer();
-        let vertices = this.createRenderedVertices();
+        let vertices = this.vertices;
         let positionArray = this.verticesToF32ArrayPoint(vertices);
-        console.log(positionArray)
         let colorArray = this.verticesToF32ArrayColor(vertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, positionArray, gl.STATIC_DRAW);
@@ -154,6 +94,24 @@ class ZeroHollow extends Shape {
         gl.enableVertexAttribArray(colorAttributeLocation);
         gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
         let matrix = m4util.projection((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight);
+        let toOrigin = m4util.translation(
+            -this.startingPoint.x - 0.5*this.dx,
+            -this.startingPoint.y - 0.5*this.dy,
+            -this.startingPoint.z - 0.5*this.dz
+        );
+        let rotxmat = m4util.xRotation(this.rotxrad);
+        let rotymat = m4util.yRotation(this.rotyrad);
+        let rotzmat = m4util.zRotation(this.rotzrad);
+        let toStart = m4util.translation(
+            this.startingPoint.x + 0.5*this.dx,
+            this.startingPoint.y + 0.5*this.dy,
+            this.startingPoint.z + 0.5*this.dz
+        );
+        matrix = m4util.multiply(matrix, toStart);
+        matrix = m4util.multiply(matrix, rotxmat);
+        matrix = m4util.multiply(matrix, rotymat);
+        matrix = m4util.multiply(matrix, rotzmat);
+        matrix = m4util.multiply(matrix, toOrigin);
         gl.uniformMatrix4fv(uMatrixLocation, false, matrix);
         gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
     }
