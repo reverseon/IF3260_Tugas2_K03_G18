@@ -1,16 +1,8 @@
 import {Point, Shape, Vertex, Color} from "./lib/baseClass";
 import {createProgramFromShaderSources, m4util} from "./lib/util";
 class ZeroHollow extends Shape {
-    startingPoint: Point = new Point(0, 0, 0, 1);
-    dx: number = 0;
-    dy: number = 0;
-    dz: number = 0;
-    thick: number = 0;
-
-    rotxrad: number = 0;
-    rotyrad: number = 0;
-    rotzrad: number = 0;
     vertices: Vertex[] = [];
+    center: Point = new Point(0, 0, 0, 1);
 
     constructor(gl: WebGLRenderingContext) {
         const vertexShaderSource = `
@@ -47,11 +39,7 @@ class ZeroHollow extends Shape {
                 new Color(v.color.r, v.color.g, v.color.b, v.color.a)
             )
         })
-        this.startingPoint = new Point(json.info.sx, json.info.sy, json.info.sz, 1);
-        this.dx = json.info.dx
-        this.dy = json.info.dy
-        this.dz = json.info.dz
-        this.thick = json.info.t
+        this.center = new Point(json.center.x, json.center.y, json.center.z, 1);
     }
     private verticesToF32ArrayPoint(vertices: Vertex[]): Float32Array {
         const f32Array = new Float32Array(vertices.length * 4);
@@ -95,22 +83,34 @@ class ZeroHollow extends Shape {
         gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
         let matrix = m4util.projection((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight);
         let toOrigin = m4util.translation(
-            -this.startingPoint.x - 0.5*this.dx,
-            -this.startingPoint.y - 0.5*this.dy,
-            -this.startingPoint.z - 0.5*this.dz
+            -this.center.x,
+            -this.center.y,
+            -this.center.z
         );
         let rotxmat = m4util.xRotation(this.rotxrad);
         let rotymat = m4util.yRotation(this.rotyrad);
         let rotzmat = m4util.zRotation(this.rotzrad);
-        let toStart = m4util.translation(
-            this.startingPoint.x + 0.5*this.dx,
-            this.startingPoint.y + 0.5*this.dy,
-            this.startingPoint.z + 0.5*this.dz
+        let translatemat = m4util.translation(
+            this.translatex,
+            this.translatey,
+            this.translatez
         );
-        matrix = m4util.multiply(matrix, toStart);
+        let scalemat = m4util.scaling(
+            this.scalex,
+            this.scaley,
+            this.scalez
+        );
+        let toCenter = m4util.translation(
+            this.center.x,
+            this.center.y,
+            this.center.z
+        );
+        matrix = m4util.multiply(matrix, toCenter);
         matrix = m4util.multiply(matrix, rotxmat);
         matrix = m4util.multiply(matrix, rotymat);
         matrix = m4util.multiply(matrix, rotzmat);
+        matrix = m4util.multiply(matrix, scalemat);
+        matrix = m4util.multiply(matrix, translatemat);
         matrix = m4util.multiply(matrix, toOrigin);
         gl.uniformMatrix4fv(uMatrixLocation, false, matrix);
         gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
