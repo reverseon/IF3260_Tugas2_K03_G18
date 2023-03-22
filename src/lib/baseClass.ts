@@ -37,11 +37,22 @@ class Vertex {
 }
 
 abstract class Shape {
+    abstract center: Point;
+    translatex: number = 0;
+    translatey: number = 0;
+    translatez: number = 0;
+    rotxrad: number = 0;
+    rotyrad: number = 0;
+    rotzrad: number = 0;
+    scalex: number = 1;
+    scaley: number = 1;
+    scalez: number = 1;
     program: WebGLProgram;
     constructor(vertices: Vertex[], program: WebGLProgram) {
         this.program = program;
     }
     abstract draw(gl: WebGLRenderingContext): void;
+    abstract loadfile(): void;
 }
 
 
