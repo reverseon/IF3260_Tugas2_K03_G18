@@ -31,7 +31,7 @@ class ZeroHollow extends Shape {
         );
     }
     async loadfile() {
-        const response = await fetch(require("./base/triangularprism.json"));
+        const response = await fetch(require("./base/zerohollow.json"));
         const json = await response.json();
         this.vertices = json.vertices.map((v: any) => {
             return new Vertex(
@@ -148,7 +148,7 @@ class TriangularPrism extends Shape {
         );
     }
     async loadfile() {
-        const response = await fetch(require("./base/zerohollow.json"));
+        const response = await fetch(require("./base/triangularprism.json"));
         const json = await response.json();
         this.vertices = json.vertices.map((v: any) => {
             return new Vertex(
