@@ -21,27 +21,27 @@ async function init() {
     await tp.loadfile();
 
     reRender(gl!, [
-        tp
+        zh, tp
     ])
     xrotinpdeg.addEventListener("input", (e) => {
         zh.rotxrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         tp.rotxrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         reRender(gl!, [
-          tp 
+          zh, tp 
         ])
     })
     yrotinpdeg.addEventListener("input", (e) => {
         zh.rotyrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         tp.rotyrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         reRender(gl!, [
-           tp
+           zh, tp
         ])
     })
     zrotinpdeg.addEventListener("input", (e) => {
         zh.rotzrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         tp.rotzrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         reRender(gl!, [
-            tp
+            zh, tp
         ])
     })
 }
