@@ -17,21 +17,81 @@
             </div>
             <div class="col-3 border border-dark rounded border-2">
                 <div class="mx-1">
-                    <h6 class="fit-content mx-auto mt-2">Control Panel</h6>
+                    <h6 class="fit-content mx-auto mt-2">Shape and Camera Mode</h6>
                     <hr class="hr">
+                    <select name="shape-selection" id="shape-selection" class="form-select mt-3">
+                        <option value="zero-hollow">Zero Hollow</option>
+                        <option value="cone">Cone</option>
+                        <option value="sphere">Sphere</option>
+                    </select>
+                    <select name="cam-selection" id="cam-selection" class="form-select mt-3">
+                        <option value="ortho-cam-mode">Orthographic</option>
+                        <option value="oblique-cam-mode">Oblique</option>
+                        <option value="pers-cam-mode" selected>Perspective</option>
+                    </select>
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" id="toggle-anim" checked>
+                        <label class="form-check-label" for="toggle-anim">Animate</label>
+                    </div>
                 </div>
                 <div class="mx-1">
+                    <h6 class="fit-content mx-auto mt-3">Camera Control</h6>
+                    <hr class="hr">
                     <div class="col-12">
-                        <label for="xrot" class="form-label">X Rotation</label><br>
-                        <input type="range" class="form-range" id="xrot" min="0" max="360" step="1" value="30">
+                        <label for="cam-xrot" class="form-label">X Rotation</label><br>
+                        <input type="range" class="form-range" id="cam-xrot" min="0" max="360" step="1" value="0">
                     </div>
                     <div class="col-12">
-                        <label for="yrot" class="form-label">Y Rotation</label><br>
-                        <input type="range" class="form-range" id="yrot" min="0" max="360" step="1" value="30">
+                        <label for="cam-yrot" class="form-label">Y Rotation</label><br>
+                        <input type="range" class="form-range" id="cam-yrot" min="0" max="360" step="1" value="0">
                     </div>
                     <div class="col-12">
-                        <label for="zrot" class="form-label">Z Rotation</label><br>
-                        <input type="range" class="form-range" id="zrot" min="0" max="360" step="1" value="30">
+                        <label for="cam-zrot" class="form-label">Z Rotation</label><br>
+                        <input type="range" class="form-range" id="cam-zrot" min="0" max="360" step="1" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label for="cam-zoom" class="form-label">Zoom</label><br>
+                        <input type="range" class="form-range" id="cam-zoom" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                </div>
+                <div class="mx-1">
+                    <h6 class="fit-content mx-auto mt-3">Object Control</h6>
+                    <hr class="hr">
+                    <div class="col-12">
+                        <label for="obj-xrot" class="form-label">X Rotation</label><br>
+                        <input type="range" class="form-range" id="obj-xrot" min="0" max="360" step="1" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-yrot" class="form-label">Y Rotation</label><br>
+                        <input type="range" class="form-range" id="obj-yrot" min="0" max="360" step="1" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-zrot" class="form-label">Z Rotation</label><br>
+                        <input type="range" class="form-range" id="obj-zrot" min="0" max="360" step="1" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-xtrans" class="form-label">X Translation</label><br>
+                        <input type="range" class="form-range" id="obj-xtrans" min="-100" max="100" step="1" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-ytrans" class="form-label">Y Translation</label><br>
+                        <input type="range" class="form-range" id="obj-ytrans" min="-100" max="100" step="1" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-ztrans" class="form-label">Z Translation</label><br>
+                        <input type="range" class="form-range" id="obj-ztrans" min="-100" max="100" step="1" value="0">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-xscale" class="form-label">X Scale</label><br>
+                        <input type="range" class="form-range" id="obj-xscale" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-yscale" class="form-label">Y Scale</label><br>
+                        <input type="range" class="form-range" id="obj-yscale" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                    <div class="col-12">
+                        <label for="obj-zscale" class="form-label">Z Scale</label><br>
+                        <input type="range" class="form-range" id="obj-zscale" min="0.1" max="5" step="0.1" value="1">
                     </div>
                 </div>
             </div>
