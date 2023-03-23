@@ -1,6 +1,6 @@
 import "./css/index.css";
 import { getWebGLContext, reRender} from "./lib/util";
-import { ZeroHollow, TriangularPrism } from "./model";
+import { ZeroHollow, TriangularPrism, Tetrahedron } from "./model";
 async function init() {
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
     let xrotinpdeg = document.getElementById("xrot") as HTMLInputElement;
@@ -9,6 +9,8 @@ async function init() {
     let gl = getWebGLContext(canvas);
     let zh =  new ZeroHollow(gl!);
     let tp =  new TriangularPrism(gl!);
+    let th = new Tetrahedron(gl!);
+
     zh.rotxrad = xrotinpdeg.valueAsNumber * Math.PI / 180;
     zh.rotyrad = yrotinpdeg.valueAsNumber * Math.PI / 180;
     zh.rotzrad = zrotinpdeg.valueAsNumber * Math.PI / 180;
@@ -17,31 +19,39 @@ async function init() {
     tp.rotyrad = yrotinpdeg.valueAsNumber * Math.PI / 180;
     tp.rotzrad = zrotinpdeg.valueAsNumber * Math.PI / 180;
 
+    tp.rotxrad = xrotinpdeg.valueAsNumber * Math.PI / 180;
+    tp.rotyrad = yrotinpdeg.valueAsNumber * Math.PI / 180;
+    tp.rotzrad = zrotinpdeg.valueAsNumber * Math.PI / 180;
+
     await zh.loadfile();
     await tp.loadfile();
+    await th.loadfile();
 
     reRender(gl!, [
-        zh, tp
+        zh, tp, th
     ])
     xrotinpdeg.addEventListener("input", (e) => {
         zh.rotxrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         tp.rotxrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
+        th.rotxrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         reRender(gl!, [
-          zh, tp 
+          zh, tp, th
         ])
     })
     yrotinpdeg.addEventListener("input", (e) => {
         zh.rotyrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         tp.rotyrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
+        th.rotyrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         reRender(gl!, [
-           zh, tp
+           zh, tp, th
         ])
     })
     zrotinpdeg.addEventListener("input", (e) => {
         zh.rotzrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         tp.rotzrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
+        th.rotzrad = (e.target as HTMLInputElement).valueAsNumber * Math.PI / 180;
         reRender(gl!, [
-            zh, tp
+            zh, tp, th
         ])
     })
 }
