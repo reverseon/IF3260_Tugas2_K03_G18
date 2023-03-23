@@ -1,6 +1,6 @@
 import "./css/index.css";
 import {getWebGLContext, reRender} from "./lib/util";
-import {ZeroHollow} from "./model";
+import {TriangularPrism, ZeroHollow} from "./model";
 import {CameraMode, Shape} from "./lib/baseClass";
 
 async function init() {
@@ -38,6 +38,8 @@ async function init() {
         objzscale.valueAsNumber = 1;
         if (shapeselection.value === "zero-hollow") {
             zh.resetparams()
+        } else if (shapeselection.value === "triangular-prism") {
+            tp.resetparams()
         }
     }
 
@@ -45,18 +47,25 @@ async function init() {
     let gl = getWebGLContext(canvas);
     let zh =  new ZeroHollow(gl!)
     await zh.loadfile();
+    let tp =  new TriangularPrism(gl!)
+    await tp.loadfile();
     let whatToRender = (): Shape => {
         if (shapeselection.value === "zero-hollow") {
             return zh;
+        } else if (shapeselection.value === "triangular-prism") {
+            return tp;
         } else {
             return zh;
         }
     }
+    let renderedShape = whatToRender();
     shapeselection.addEventListener("change", () => {
         resetValues();
         renderedShape = whatToRender();
+        reRender(gl!, [
+            renderedShape
+        ])
     })
-    let renderedShape = whatToRender();
     reRender(gl!, [
         renderedShape
     ])

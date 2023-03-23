@@ -270,6 +270,13 @@ class TriangularPrism extends Shape {
         }
         return f32Array;
     }
+
+    resetparams() {
+        super.resetparams();
+        this.orthoInstance.resetparams();
+        this.perspectiveInstance.resetparams();
+    }
+
     draw(gl: WebGLRenderingContext): void {
         gl.useProgram(this.program);
         let positionAttributeLocation = gl.getAttribLocation(this.program, "a_position");
@@ -288,7 +295,42 @@ class TriangularPrism extends Shape {
         gl.bufferData(gl.ARRAY_BUFFER, colorArray, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(colorAttributeLocation);
         gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
-        let matrix = m4util.projection((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight);
+        let matrix: number[] = []
+        let depth = 1000;
+        if (this.camMode == CameraMode.Ortho) {
+            this.orthoInstance.updateProjectionMatrix((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight, depth);
+            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
+            // this.orthoInstance.translatez = -depth / 2;
+            this.orthoInstance.updateViewMatrix();
+            matrix = m4util.multiply(this.orthoInstance.projectionMatrix, this.orthoInstance.viewMatrix);
+        } else if (this.camMode == CameraMode.Perspective) {
+            this.perspectiveInstance.updateProjectionMatrix(
+                60 * Math.PI / 180,
+                (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight,
+                1,
+                depth,
+            )
+            // this.perspectiveInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            // this.perspectiveInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
+            this.perspectiveInstance.translatez = -depth / 2;
+            this.perspectiveInstance.updateViewMatrix();
+            matrix = m4util.multiply(this.perspectiveInstance.projectionMatrix, this.perspectiveInstance.viewMatrix);
+        } else if (this.camMode == CameraMode.Oblique) {
+            this.obliqueInstance.updateProjectionMatrix(
+                60 * Math.PI / 180,
+                45 * Math.PI / 180,
+                (gl.canvas as HTMLCanvasElement).clientWidth,
+                (gl.canvas as HTMLCanvasElement).clientHeight,
+                depth,
+            )
+            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
+            // this.obliqueInstance.translatez = -depth / 2;
+            this.obliqueInstance.updateViewMatrix();
+            matrix = m4util.multiply(this.obliqueInstance.projectionMatrix, this.obliqueInstance.viewMatrix);
+            // matrix = this.obliqueInstance.projectionMatrix;
+        }
         let toOrigin = m4util.translation(
             -this.center.x,
             -this.center.y,
