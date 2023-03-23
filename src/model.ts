@@ -311,6 +311,10 @@ class Tetrahedron extends Shape{
         let vertices = this.vertices;
         let positionArray = this.verticesToF32ArrayPoint(vertices);
         let colorArray = this.verticesToF32ArrayColor(vertices);
+        gl.enable(gl.DEPTH_TEST);
+        /*gl.enable(gl.CULL_FACE);
+        gl.cullFace(gl.BACK);
+        gl.frontFace(gl.CW);*/
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, positionArray, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(positionAttributeLocation);
@@ -319,7 +323,8 @@ class Tetrahedron extends Shape{
         gl.bufferData(gl.ARRAY_BUFFER, colorArray, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(colorAttributeLocation);
         gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
-        let matrix = m4util.projection((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight);
+        let projectionMatrix = m4util.projection((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight);
+        //let projectionMatrix = m4util.perspective(1.7, ((gl.canvas as HTMLCanvasElement).clientWidth as GLfloat)/((gl.canvas as HTMLCanvasElement).clientHeight as GLfloat), 1, 1000 );
         let toOrigin = m4util.translation(
             -this.center.x,
             -this.center.y,
@@ -343,12 +348,19 @@ class Tetrahedron extends Shape{
             this.center.y,
             this.center.z
         );
+        let cam = [100,100,-50];
+        let tar = [100, 100, 100];
+        let up = [0,1,0];
+        let cameraMatrix = m4util.lookat(cam, tar, up);
+        let viewMatrix = m4util.inverse(cameraMatrix);
+        let projectionViewMatrix = m4util.multiply(projectionMatrix, viewMatrix);
+        let matrix = projectionViewMatrix;
         matrix = m4util.multiply(matrix, toCenter);
+        matrix = m4util.multiply(matrix, translatemat);
         matrix = m4util.multiply(matrix, rotxmat);
         matrix = m4util.multiply(matrix, rotymat);
         matrix = m4util.multiply(matrix, rotzmat);
         matrix = m4util.multiply(matrix, scalemat);
-        matrix = m4util.multiply(matrix, translatemat);
         matrix = m4util.multiply(matrix, toOrigin);
         gl.uniformMatrix4fv(uMatrixLocation, false, matrix);
         gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
