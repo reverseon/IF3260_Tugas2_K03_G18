@@ -367,8 +367,8 @@ class TriangularPrism extends Shape {
 }
 
 class Tetrahedron extends Shape{
-    center: Point = new Point(100,100,100,0);
-    vertices : Vertex[] = [];
+    vertices: Vertex[] = [];
+    center: Point = new Point(100,100,100,1);
     constructor(gl: WebGLRenderingContext){
         const vertexShaderSource = `
             attribute vec4 a_position;
@@ -396,7 +396,6 @@ class Tetrahedron extends Shape{
             )!
         )
     }
-
     async loadfile() {
         const response = await fetch(require("./base/tetrahedron.json"));
         const json = await response.json();
@@ -432,6 +431,11 @@ class Tetrahedron extends Shape{
         return f32Array;
     }
 
+    resetparams(): void {
+        super.resetparams();
+        this.orthoInstance.resetparams();
+        this.perspectiveInstance.resetparams();
+    }
     draw(gl: WebGLRenderingContext): void {
         gl.useProgram(this.program);
         let positionAttributeLocation = gl.getAttribLocation(this.program, "a_position");
@@ -442,7 +446,6 @@ class Tetrahedron extends Shape{
         let vertices = this.vertices;
         let positionArray = this.verticesToF32ArrayPoint(vertices);
         let colorArray = this.verticesToF32ArrayColor(vertices);
-        gl.enable(gl.DEPTH_TEST);
         /*gl.enable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
         gl.frontFace(gl.CW);*/
@@ -454,8 +457,41 @@ class Tetrahedron extends Shape{
         gl.bufferData(gl.ARRAY_BUFFER, colorArray, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(colorAttributeLocation);
         gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
-        let projectionMatrix = m4util.projection((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight);
-        //let projectionMatrix = m4util.perspective(1.7, ((gl.canvas as HTMLCanvasElement).clientWidth as GLfloat)/((gl.canvas as HTMLCanvasElement).clientHeight as GLfloat), 1, 1000 );
+        let matrix : number[] = [];
+        let depth = 1000;
+        if (this.camMode == CameraMode.Ortho){
+            this.orthoInstance.updateProjectionMatrix((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight, depth);
+            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
+            this.orthoInstance.updateViewMatrix();
+            matrix = m4util.multiply(this.orthoInstance.projectionMatrix, this.orthoInstance.viewMatrix);
+        } else if (this.camMode == CameraMode.Perspective) {
+            this.perspectiveInstance.updateProjectionMatrix(
+                60 * Math.PI / 180,
+                (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight,
+                1,
+                depth,
+            )
+            // this.perspectiveInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            // this.perspectiveInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
+            this.perspectiveInstance.translatez = -depth / 2;
+            this.perspectiveInstance.updateViewMatrix();
+            matrix = m4util.multiply(this.perspectiveInstance.projectionMatrix, this.perspectiveInstance.viewMatrix);
+        } else if (this.camMode == CameraMode.Oblique) {
+            this.obliqueInstance.updateProjectionMatrix(
+                60 * Math.PI / 180,
+                45 * Math.PI / 180,
+                (gl.canvas as HTMLCanvasElement).clientWidth,
+                (gl.canvas as HTMLCanvasElement).clientHeight,
+                depth,
+            )
+            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
+            // this.obliqueInstance.translatez = -depth / 2;
+            this.obliqueInstance.updateViewMatrix();
+            matrix = m4util.multiply(this.obliqueInstance.projectionMatrix, this.obliqueInstance.viewMatrix);
+            // matrix = this.obliqueInstance.projectionMatrix;
+        }
         let toOrigin = m4util.translation(
             -this.center.x,
             -this.center.y,
@@ -479,12 +515,6 @@ class Tetrahedron extends Shape{
             this.center.y,
             this.center.z
         );
-        let cam = [100,100,-50];
-        let tar = [100, 100, 100];
-        let up = [0,1,0];
-        let cameraMatrix = m4util.lookat(cam, tar, up);
-        let viewMatrix = m4util.inverse(cameraMatrix);
-        let matrix = m4util.multiply(projectionMatrix, viewMatrix);
         matrix = m4util.multiply(matrix, toCenter);
         matrix = m4util.multiply(matrix, translatemat);
         matrix = m4util.multiply(matrix, rotxmat);
