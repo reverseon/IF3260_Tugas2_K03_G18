@@ -483,7 +483,7 @@ class TriangularPrism extends Shape {
 }
 
 class Tetrahedron extends Shape{
-    center: Point = new Point(100,100,100,0);
+    center: Point = new Point(0,0,0,1);
     renderedVertices : Vertex[] = [];
     constructor(gl: WebGLRenderingContext){
         const vertexShaderSource = `
@@ -534,8 +534,7 @@ class Tetrahedron extends Shape{
                 new Point(v.position.x, v.position.y, v.position.z, v.position.w),
                 new Color(v.color.r, v.color.g, v.color.b, v.color.a)
             )
-        })
-        this.center = new Point(json.center.x, json.center.y, json.center.z, 1);
+        });
     }
 
     private verticesToF32ArrayPoint(vertices: Vertex[]): Float32Array {
