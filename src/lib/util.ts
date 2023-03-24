@@ -66,7 +66,33 @@ const reRender = (gl: WebGLRenderingContext, shapeCollection: Shape[]) => {
     gl.enable(gl.CULL_FACE);
     shapeCollection.forEach(shape => shape.draw(gl));
 }
+
+const normaloftriangle = (p1: number[], p2: number[], p3: number[]): number[] => {
+    const v1 = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]];
+    const v2 = [p3[0] - p1[0], p3[1] - p1[1], p3[2] - p1[2]];
+    const normal = [v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2], v1[0] * v2[1] - v1[1] * v2[0]];
+    const len = Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+    const norm = [normal[0] / len, normal[1] / len, normal[2] / len];
+    return [
+        norm[0], norm[1], norm[2],
+        norm[0], norm[1], norm[2],
+        norm[0], norm[1], norm[2],
+    ]
+}
+
 abstract class m4util {
+    static normalize(v: number[]): number[] {
+        const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        return [v[0] / len, v[1] / len, v[2] / len];
+    }
+    static transpose(m: number[]): number[] {
+        return [
+            m[0], m[4], m[8], m[12],
+            m[1], m[5], m[9], m[13],
+            m[2], m[6], m[10], m[14],
+            m[3], m[7], m[11], m[15],
+        ];
+    }
     static translation(tx: number, ty: number, tz: number): number[] {
         return [
             1, 0, 0, 0,
@@ -272,6 +298,7 @@ abstract class m4util {
         var zAxis = v3util.normalize(v3util.subtractVectors(camera, target));
         var xAxis = v3util.normalize(v3util.cross(up, zAxis));
         var yAxis = v3util.normalize(v3util.cross(zAxis, xAxis));
+        console.log(`xAxis: ${xAxis}, yAxis: ${yAxis}, zAxis: ${zAxis}`);
 
         return [
             xAxis[0], xAxis[1], xAxis[2], 0,
@@ -308,5 +335,6 @@ export {
     createProgramFromShaderSources,
     reRender,
     resizeCanvas,
+    normaloftriangle,
     m4util
 }

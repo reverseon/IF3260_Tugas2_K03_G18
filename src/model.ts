@@ -13,18 +13,30 @@ class ZeroHollow extends Shape {
         const vertexShaderSource = `
             attribute vec4 a_position;
             attribute vec4 a_color;
+            attribute vec4 a_normal;
             varying vec4 v_color;
             uniform mat4 u_matrix;
+            uniform mat4 u_viewTransposeMatrix;
+            varying vec3 v_normal;
             void main() {
                 v_color = a_color;
                 gl_Position = u_matrix * a_position;
+                v_normal = mat3(u_viewTransposeMatrix) * a_normal.xyz;
             }
         `
         const fragmentShaderSource = `
             precision mediump float;
+            uniform bool u_shading;
+            uniform vec3 u_lightWorldPos;
             varying vec4 v_color;
+            varying vec3 v_normal;
             void main() {
+                vec3 normal = normalize(v_normal);
+                float light = dot(u_lightWorldPos, normal);
                 gl_FragColor = v_color;
+                if (u_shading) {
+                    gl_FragColor.rgb *= light;
+                }
             }
         `
         super([],
@@ -42,7 +54,7 @@ class ZeroHollow extends Shape {
         return new Color(r, g, b, 1);
     }
     async loadfile() {
-        const response = await fetch(require("./base/zerohollow.json"));
+        const response = await fetch(require("./base/basemodel.json"));
         const jsonraw = await response.json();
         const json = jsonraw.zeroHollow
         this.points = json.vertices.map(
@@ -97,12 +109,37 @@ class ZeroHollow extends Shape {
         }
         return new Float32Array(array);
     }
-    resetparams() {
-        super.resetparams();
-        this.orthoInstance.resetparams();
-        this.perspectiveInstance.resetparams();
+    private pointsToF32PointArray(points: Point[]): Float32Array {
+        let array: number[] = [];
+        for (let i = 0; i < points.length; i++) {
+            array.push(points[i].x);
+            array.push(points[i].y);
+            array.push(points[i].z);
+            array.push(points[i].w);
+        }
+        return new Float32Array(array);
     }
-
+    private createNormal(vertices: Vertex[]): Point[] {
+        let pts = vertices.map(v => v.position)
+        let normals: Point[] = []
+        for (let i = 0; i < pts.length; i+=3) {
+            let p1 = pts[i]
+            let p2 = pts[i+1]
+            let p3 = pts[i+2]
+            let v1 = new Point(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z, 1)
+            let v2 = new Point(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z, 1)
+            let normal = new Point(
+                v1.y * v2.z - v1.z * v2.y,
+                v1.z * v2.x - v1.x * v2.z,
+                v1.x * v2.y - v1.y * v2.x,
+                1
+            )
+            normals.push(normal)
+            normals.push(normal)
+            normals.push(normal)
+        }
+        return normals
+    }
     draw(gl: WebGLRenderingContext): void {
         gl.useProgram(this.program);
         let positionAttributeLocation = gl.getAttribLocation(this.program, "a_position");
@@ -127,35 +164,31 @@ class ZeroHollow extends Shape {
             this.orthoInstance.updateProjectionMatrix((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight, depth);
             this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
             this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            // this.orthoInstance.translatez = -depth / 2;
             this.orthoInstance.updateViewMatrix();
             matrix = m4util.multiply(this.orthoInstance.projectionMatrix, this.orthoInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Perspective) {
+            this.perspectiveInstance.focus = this.center
             this.perspectiveInstance.updateProjectionMatrix(
                 60 * Math.PI / 180,
                 (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight,
                 1,
                 depth,
             )
-            // this.perspectiveInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
-            // this.perspectiveInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            this.perspectiveInstance.translatez = -depth / 2;
+            this.perspectiveInstance.translatez = -depth/2;
             this.perspectiveInstance.updateViewMatrix();
             matrix = m4util.multiply(this.perspectiveInstance.projectionMatrix, this.perspectiveInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Oblique) {
             this.obliqueInstance.updateProjectionMatrix(
-                60 * Math.PI / 180,
                 45 * Math.PI / 180,
+                75 * Math.PI / 180,
                 (gl.canvas as HTMLCanvasElement).clientWidth,
                 (gl.canvas as HTMLCanvasElement).clientHeight,
                 depth,
             )
             this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
             this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            // this.obliqueInstance.translatez = -depth / 2;
             this.obliqueInstance.updateViewMatrix();
             matrix = m4util.multiply(this.obliqueInstance.projectionMatrix, this.obliqueInstance.viewMatrix);
-            // matrix = this.obliqueInstance.projectionMatrix;
         }
         let toOrigin = m4util.translation(
             -this.center.x,
@@ -187,8 +220,32 @@ class ZeroHollow extends Shape {
         matrix = m4util.multiply(matrix, rotzmat);
         matrix = m4util.multiply(matrix, scalemat);
         matrix = m4util.multiply(matrix, toOrigin);
+        let viewtransposeMatrix = toCenter
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, translatemat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotxmat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotymat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotzmat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, scalemat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, toOrigin);
+        viewtransposeMatrix = m4util.transpose(m4util.inverse(viewtransposeMatrix));
         gl.uniformMatrix4fv(uMatrixLocation, false, matrix);
+        // lighting
+        let lightDirection = m4util.normalize([0, 0, 1]);
+        let uLightDirectionLocation = gl.getUniformLocation(this.program, "u_lightWorldPos");
+        gl.uniform3fv(uLightDirectionLocation, lightDirection);
+        let normals: Point[] = this.createNormal(this.renderedVertices);
+        let normalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.pointsToF32PointArray(normals), gl.STATIC_DRAW);
+        let normalAttributeLocation = gl.getAttribLocation(this.program, "a_normal");
+        gl.enableVertexAttribArray(normalAttributeLocation);
+        gl.vertexAttribPointer(normalAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+        let uViewTransposeMatrixLocation = gl.getUniformLocation(this.program, "u_viewTransposeMatrix");
+        gl.uniformMatrix4fv(uViewTransposeMatrixLocation, false, viewtransposeMatrix);
+        let ushadingLocation = gl.getUniformLocation(this.program, "u_shading");
+        gl.uniform1i(ushadingLocation, this.shading ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES, 0, this.renderedVertices.length)
+        // let posCopy: Point[] = this.renderedVertices.map((v) => {return v.position})
         // for (let i = 0; i < posCopy.length; i++) {
         //     let ps = posCopy[i];
         //     let p = m4util.matvec(matrix, [
@@ -208,25 +265,37 @@ class ZeroHollow extends Shape {
     }
 }
 class TriangularPrism extends Shape {
-    vertices: Vertex[] = [];
+    renderedVertices: Vertex[] = [];
     center: Point = new Point(150, 150, 195, 1);
 
     constructor(gl: WebGLRenderingContext) {
         const vertexShaderSource = `
             attribute vec4 a_position;
             attribute vec4 a_color;
+            attribute vec4 a_normal;
             varying vec4 v_color;
             uniform mat4 u_matrix;
+            uniform mat4 u_viewTransposeMatrix;
+            varying vec3 v_normal;
             void main() {
                 v_color = a_color;
                 gl_Position = u_matrix * a_position;
+                v_normal = mat3(u_viewTransposeMatrix) * a_normal.xyz;
             }
         `
         const fragmentShaderSource = `
             precision mediump float;
+            uniform vec3 u_lightWorldPos;
+            uniform bool u_shading;
             varying vec4 v_color;
+            varying vec3 v_normal;
             void main() {
+                vec3 normal = normalize(v_normal);
+                float light = dot(u_lightWorldPos, normal);
                 gl_FragColor = v_color;
+                if (u_shading) {
+                    gl_FragColor.rgb *= light;
+                }
             }
         `
         super([],
@@ -236,11 +305,13 @@ class TriangularPrism extends Shape {
                 fragmentShaderSource
             )!
         );
+
     }
     async loadfile() {
-        const response = await fetch(require("./base/triangularprism.json"));
-        const json = await response.json();
-        this.vertices = json.vertices.map((v: any) => {
+        const response = await fetch(require("./base/basemodel.json"));
+        const jsonraw = await response.json();
+        const json = jsonraw.triangularprism
+        this.renderedVertices = json.vertices.map((v: any) => {
             return new Vertex(
                 new Point(v.position.x, v.position.y, v.position.z, v.position.w),
                 new Color(v.color.r, v.color.g, v.color.b, v.color.a)
@@ -270,11 +341,36 @@ class TriangularPrism extends Shape {
         }
         return f32Array;
     }
-
-    resetparams() {
-        super.resetparams();
-        this.orthoInstance.resetparams();
-        this.perspectiveInstance.resetparams();
+    private createNormal(vertices: Vertex[]): Point[] {
+        let pts = vertices.map(v => v.position)
+        let normals: Point[] = []
+        for (let i = 0; i < pts.length; i+=3) {
+            let p1 = pts[i]
+            let p2 = pts[i+1]
+            let p3 = pts[i+2]
+            let v1 = new Point(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z, 1)
+            let v2 = new Point(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z, 1)
+            let normal = new Point(
+                v1.y * v2.z - v1.z * v2.y,
+                v1.z * v2.x - v1.x * v2.z,
+                v1.x * v2.y - v1.y * v2.x,
+                1
+            )
+            normals.push(normal)
+            normals.push(normal)
+            normals.push(normal)
+        }
+        return normals
+    }
+    private pointsToF32PointArray(points: Point[]): Float32Array {
+        let array: number[] = [];
+        for (let i = 0; i < points.length; i++) {
+            array.push(points[i].x);
+            array.push(points[i].y);
+            array.push(points[i].z);
+            array.push(points[i].w);
+        }
+        return new Float32Array(array);
     }
 
     draw(gl: WebGLRenderingContext): void {
@@ -284,9 +380,8 @@ class TriangularPrism extends Shape {
         let uMatrixLocation = gl.getUniformLocation(this.program, "u_matrix");
         let positionBuffer = gl.createBuffer();
         let colorBuffer = gl.createBuffer();
-        let vertices = this.vertices;
-        let positionArray = this.verticesToF32ArrayPoint(vertices);
-        let colorArray = this.verticesToF32ArrayColor(vertices);
+        let positionArray = this.verticesToF32ArrayPoint(this.renderedVertices);
+        let colorArray = this.verticesToF32ArrayColor(this.renderedVertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, positionArray, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(positionAttributeLocation);
@@ -299,37 +394,35 @@ class TriangularPrism extends Shape {
         let depth = 1000;
         if (this.camMode == CameraMode.Ortho) {
             this.orthoInstance.updateProjectionMatrix((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight, depth);
-            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
-            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            // this.orthoInstance.translatez = -depth / 2;
+            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
+            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
             this.orthoInstance.updateViewMatrix();
             matrix = m4util.multiply(this.orthoInstance.projectionMatrix, this.orthoInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Perspective) {
+            this.perspectiveInstance.focus = this.center
             this.perspectiveInstance.updateProjectionMatrix(
                 60 * Math.PI / 180,
                 (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight,
                 1,
                 depth,
             )
-            // this.perspectiveInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
-            // this.perspectiveInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            this.perspectiveInstance.translatez = -depth / 2;
+            this.perspectiveInstance.translatex = this.center.x;
+            this.perspectiveInstance.translatey = this.center.y;
+            this.perspectiveInstance.translatez = -depth/2 + this.center.z;
             this.perspectiveInstance.updateViewMatrix();
             matrix = m4util.multiply(this.perspectiveInstance.projectionMatrix, this.perspectiveInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Oblique) {
             this.obliqueInstance.updateProjectionMatrix(
-                60 * Math.PI / 180,
                 45 * Math.PI / 180,
+                75 * Math.PI / 180,
                 (gl.canvas as HTMLCanvasElement).clientWidth,
                 (gl.canvas as HTMLCanvasElement).clientHeight,
                 depth,
             )
-            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
-            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            // this.obliqueInstance.translatez = -depth / 2;
+            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
+            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
             this.obliqueInstance.updateViewMatrix();
             matrix = m4util.multiply(this.obliqueInstance.projectionMatrix, this.obliqueInstance.viewMatrix);
-            // matrix = this.obliqueInstance.projectionMatrix;
         }
         let toOrigin = m4util.translation(
             -this.center.x,
@@ -355,51 +448,88 @@ class TriangularPrism extends Shape {
             this.center.z
         );
         matrix = m4util.multiply(matrix, toCenter);
+        matrix = m4util.multiply(matrix, translatemat);
         matrix = m4util.multiply(matrix, rotxmat);
         matrix = m4util.multiply(matrix, rotymat);
         matrix = m4util.multiply(matrix, rotzmat);
         matrix = m4util.multiply(matrix, scalemat);
-        matrix = m4util.multiply(matrix, translatemat);
         matrix = m4util.multiply(matrix, toOrigin);
+        let viewtransposeMatrix = toCenter
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, translatemat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotxmat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotymat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotzmat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, scalemat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, toOrigin);
+        viewtransposeMatrix = m4util.transpose(m4util.inverse(viewtransposeMatrix));
         gl.uniformMatrix4fv(uMatrixLocation, false, matrix);
-        gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
+        // lighting
+        let lightDirection = m4util.normalize([0, 0, 1]);
+        let uLightDirectionLocation = gl.getUniformLocation(this.program, "u_lightWorldPos");
+        gl.uniform3fv(uLightDirectionLocation, lightDirection);
+        let normals: Point[] = this.createNormal(this.renderedVertices);
+        let normalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.pointsToF32PointArray(normals), gl.STATIC_DRAW);
+        let normalAttributeLocation = gl.getAttribLocation(this.program, "a_normal");
+        gl.enableVertexAttribArray(normalAttributeLocation);
+        gl.vertexAttribPointer(normalAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+        let uViewTransposeMatrixLocation = gl.getUniformLocation(this.program, "u_viewTransposeMatrix");
+        gl.uniformMatrix4fv(uViewTransposeMatrixLocation, false, viewtransposeMatrix);
+        let uShadingLocation = gl.getUniformLocation(this.program, "u_shading");
+        gl.uniform1i(uShadingLocation, this.shading ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, this.renderedVertices.length)
     }
 }
 
 class Tetrahedron extends Shape{
-    vertices: Vertex[] = [];
-    center: Point = new Point(100,100,100,1);
+    center: Point = new Point(100,100,100,0);
+    renderedVertices : Vertex[] = [];
     constructor(gl: WebGLRenderingContext){
         const vertexShaderSource = `
             attribute vec4 a_position;
             attribute vec4 a_color;
+            attribute vec4 a_normal;
             varying vec4 v_color;
             uniform mat4 u_matrix;
+            uniform mat4 u_viewTransposeMatrix;
+            varying vec3 v_normal;
             void main() {
                 v_color = a_color;
                 gl_Position = u_matrix * a_position;
+                v_normal = mat3(u_viewTransposeMatrix) * a_normal.xyz;
             }
         `
         const fragmentShaderSource = `
             precision mediump float;
+            uniform bool u_shading;
+            uniform vec3 u_lightWorldPos;
             varying vec4 v_color;
+            varying vec3 v_normal;
             void main() {
+                vec3 normal = normalize(v_normal);
+                float light = dot(u_lightWorldPos, normal);
                 gl_FragColor = v_color;
+                if (u_shading) {
+                    gl_FragColor.rgb *= light;
+                }
             }
         `
-
         super([],
             createProgramFromShaderSources(
                 gl,
                 vertexShaderSource,
                 fragmentShaderSource
             )!
-        )
+        );
+
     }
+
     async loadfile() {
-        const response = await fetch(require("./base/tetrahedron.json"));
-        const json = await response.json();
-        this.vertices = json.vertices.map((v: any) => {
+        const response = await fetch(require("./base/basemodel.json"));
+        const jsonraw = await response.json();
+        const json = jsonraw.tetrahedron;
+        this.renderedVertices = json.vertices.map((v: any) => {
             return new Vertex(
                 new Point(v.position.x, v.position.y, v.position.z, v.position.w),
                 new Color(v.color.r, v.color.g, v.color.b, v.color.a)
@@ -431,10 +561,36 @@ class Tetrahedron extends Shape{
         return f32Array;
     }
 
-    resetparams(): void {
-        super.resetparams();
-        this.orthoInstance.resetparams();
-        this.perspectiveInstance.resetparams();
+    private createNormal(vertices: Vertex[]): Point[] {
+        let pts = vertices.map(v => v.position)
+        let normals: Point[] = []
+        for (let i = 0; i < pts.length; i+=3) {
+            let p1 = pts[i]
+            let p2 = pts[i+1]
+            let p3 = pts[i+2]
+            let v1 = new Point(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z, 1)
+            let v2 = new Point(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z, 1)
+            let normal = new Point(
+                v1.y * v2.z - v1.z * v2.y,
+                v1.z * v2.x - v1.x * v2.z,
+                v1.x * v2.y - v1.y * v2.x,
+                1
+            )
+            normals.push(normal)
+            normals.push(normal)
+            normals.push(normal)
+        }
+        return normals
+    }
+    private pointsToF32PointArray(points: Point[]): Float32Array {
+        let array: number[] = [];
+        for (let i = 0; i < points.length; i++) {
+            array.push(points[i].x);
+            array.push(points[i].y);
+            array.push(points[i].z);
+            array.push(points[i].w);
+        }
+        return new Float32Array(array);
     }
     draw(gl: WebGLRenderingContext): void {
         gl.useProgram(this.program);
@@ -443,12 +599,9 @@ class Tetrahedron extends Shape{
         let uMatrixLocation = gl.getUniformLocation(this.program, "u_matrix");
         let positionBuffer = gl.createBuffer();
         let colorBuffer = gl.createBuffer();
-        let vertices = this.vertices;
-        let positionArray = this.verticesToF32ArrayPoint(vertices);
-        let colorArray = this.verticesToF32ArrayColor(vertices);
-        /*gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.BACK);
-        gl.frontFace(gl.CW);*/
+        // this.createRenderedVertices();
+        let positionArray = this.verticesToF32ArrayPoint(this.renderedVertices);
+        let colorArray = this.verticesToF32ArrayColor(this.renderedVertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, positionArray, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(positionAttributeLocation);
@@ -457,40 +610,39 @@ class Tetrahedron extends Shape{
         gl.bufferData(gl.ARRAY_BUFFER, colorArray, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(colorAttributeLocation);
         gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
-        let matrix : number[] = [];
+        let matrix: number[] = []
         let depth = 1000;
-        if (this.camMode == CameraMode.Ortho){
+        if (this.camMode == CameraMode.Ortho) {
             this.orthoInstance.updateProjectionMatrix((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight, depth);
-            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
-            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
+            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
+            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
             this.orthoInstance.updateViewMatrix();
             matrix = m4util.multiply(this.orthoInstance.projectionMatrix, this.orthoInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Perspective) {
+            this.perspectiveInstance.focus = this.center
             this.perspectiveInstance.updateProjectionMatrix(
                 60 * Math.PI / 180,
                 (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight,
                 1,
                 depth,
             )
-            // this.perspectiveInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
-            // this.perspectiveInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            this.perspectiveInstance.translatez = -depth / 2;
+            this.perspectiveInstance.translatez = -depth/2 + this.center.z;
+            this.perspectiveInstance.translatex = this.center.x;
+            this.perspectiveInstance.translatey = this.center.y;
             this.perspectiveInstance.updateViewMatrix();
             matrix = m4util.multiply(this.perspectiveInstance.projectionMatrix, this.perspectiveInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Oblique) {
             this.obliqueInstance.updateProjectionMatrix(
-                60 * Math.PI / 180,
                 45 * Math.PI / 180,
+                75 * Math.PI / 180,
                 (gl.canvas as HTMLCanvasElement).clientWidth,
                 (gl.canvas as HTMLCanvasElement).clientHeight,
                 depth,
             )
-            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
-            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
-            // this.obliqueInstance.translatez = -depth / 2;
+            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
+            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
             this.obliqueInstance.updateViewMatrix();
             matrix = m4util.multiply(this.obliqueInstance.projectionMatrix, this.obliqueInstance.viewMatrix);
-            // matrix = this.obliqueInstance.projectionMatrix;
         }
         let toOrigin = m4util.translation(
             -this.center.x,
@@ -522,8 +674,31 @@ class Tetrahedron extends Shape{
         matrix = m4util.multiply(matrix, rotzmat);
         matrix = m4util.multiply(matrix, scalemat);
         matrix = m4util.multiply(matrix, toOrigin);
+        let viewtransposeMatrix = toCenter
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, translatemat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotxmat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotymat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, rotzmat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, scalemat);
+        viewtransposeMatrix = m4util.multiply(viewtransposeMatrix, toOrigin);
+        viewtransposeMatrix = m4util.transpose(m4util.inverse(viewtransposeMatrix));
         gl.uniformMatrix4fv(uMatrixLocation, false, matrix);
-        gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
+        // lighting
+        let lightDirection = m4util.normalize([0, 0, 1]);
+        let uLightDirectionLocation = gl.getUniformLocation(this.program, "u_lightWorldPos");
+        gl.uniform3fv(uLightDirectionLocation, lightDirection);
+        let normals: Point[] = this.createNormal(this.renderedVertices);
+        let normalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.pointsToF32PointArray(normals), gl.STATIC_DRAW);
+        let normalAttributeLocation = gl.getAttribLocation(this.program, "a_normal");
+        gl.enableVertexAttribArray(normalAttributeLocation);
+        gl.vertexAttribPointer(normalAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+        let uViewTransposeMatrixLocation = gl.getUniformLocation(this.program, "u_viewTransposeMatrix");
+        gl.uniformMatrix4fv(uViewTransposeMatrixLocation, false, viewtransposeMatrix);
+        let uShadingLocation = gl.getUniformLocation(this.program, "u_shading");
+        gl.uniform1i(uShadingLocation, this.shading ? 1 : 0);
+        gl.drawArrays(gl.TRIANGLES, 0, this.renderedVertices.length)
     }
 }
 

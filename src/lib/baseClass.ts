@@ -54,6 +54,7 @@ abstract class Shape {
     orthoInstance: OrthoCamera = new OrthoCamera();
     perspectiveInstance: PerspectiveCamera = new PerspectiveCamera();
     obliqueInstance: ObliqueCamera = new ObliqueCamera();
+    shading: boolean = true;
     constructor(vertices: Vertex[], program: WebGLProgram) {
         this.program = program;
     }
@@ -69,6 +70,9 @@ abstract class Shape {
         this.scalex = 1;
         this.scaley = 1;
         this.scalez = 1;
+        this.orthoInstance.resetparams();
+        this.perspectiveInstance.resetparams();
+        this.obliqueInstance.resetparams();
     }
 }
 
@@ -87,6 +91,9 @@ abstract class Camera {
     translatey: number = 0;
     translatez: number = 0;
     zoom: number = 1;
+
+    focus: Point = new Point(0, 0, 0, 1);
+
     abstract projectionMatrix: number[];
     abstract viewMatrix: number[];
     resetparams(): void {
@@ -139,17 +146,17 @@ class PerspectiveCamera extends Camera {
         let rangeInv = 1.0 / (znear - zfar);
         //alert(`f: ${f}, rangeInv: ${rangeInv}, ratio: ${ratio}, znear: ${znear}, zfar: ${zfar}`)
         this.projectionMatrix = [
-            f / ratio, 0, 0, 0,
+            f/ratio , 0, 0, 0,
             0, f, 0, 0,
             0, 0, (znear + zfar) * rangeInv, 1,
             0, 0, znear * zfar * rangeInv * 2, 0
         ];
     }
     updateViewMatrix(): void {
-        this.viewMatrix = m4util.xRotation(this.rotxrad);
-        this.viewMatrix = m4util.multiply(this.viewMatrix, m4util.yRotation(this.rotyrad));
-        this.viewMatrix = m4util.multiply(this.viewMatrix, m4util.zRotation(this.rotzrad));
-        this.viewMatrix = m4util.multiply(this.viewMatrix, m4util.translation(this.translatex, this.translatey, this.translatez + this.zoom * 100));
+        let tviewMatrix = m4util.yRotation(this.rotyrad);
+        // tviewMatrix = m4util.multiply(tviewMatrix, m4util.zRotation(this.rotzrad));
+        tviewMatrix = m4util.multiply(tviewMatrix, m4util.translation(this.translatex, this.translatey, this.translatez + this.zoom * 100));
+        this.viewMatrix = tviewMatrix
         this.viewMatrix = m4util.inverse(this.viewMatrix);
     }
 }

@@ -4,15 +4,15 @@ import {Tetrahedron, TriangularPrism, ZeroHollow} from "./model";
 import {CameraMode, Shape} from "./lib/baseClass";
 
 async function init() {
-    let isAnimating = false;
+    let isAnimating = true;
+    let isShading = true;
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
     let camselection = document.getElementById("cam-selection") as HTMLSelectElement;
     let shapeselection = document.getElementById("shape-selection") as HTMLSelectElement;
-    let camxrot = document.getElementById("cam-xrot") as HTMLInputElement;
     let camyrot = document.getElementById("cam-yrot") as HTMLInputElement;
-    let camzrot = document.getElementById("cam-zrot") as HTMLInputElement;
     let camzoom = document.getElementById("cam-zoom") as HTMLInputElement;
     let animateswitch = document.getElementById("toggle-anim") as HTMLInputElement;
+    let shadingswitch = document.getElementById("toggle-shading") as HTMLInputElement;
     let objxrot = document.getElementById("obj-xrot") as HTMLInputElement;
     let objyrot = document.getElementById("obj-yrot") as HTMLInputElement;
     let objzrot = document.getElementById("obj-zrot") as HTMLInputElement;
@@ -23,9 +23,7 @@ async function init() {
     let objyscale = document.getElementById("obj-yscale") as HTMLInputElement;
     let objzscale = document.getElementById("obj-zscale") as HTMLInputElement;
     let resetValues = () => {
-        camxrot.valueAsNumber = 0;
         camyrot.valueAsNumber = 0;
-        camzrot.valueAsNumber = 0;
         camzoom.valueAsNumber = 1;
         objxrot.valueAsNumber = 0;
         objyrot.valueAsNumber = 0;
@@ -38,38 +36,48 @@ async function init() {
         objzscale.valueAsNumber = 1;
         if (shapeselection.value === "zero-hollow") {
             zh.resetparams()
+        } else if (shapeselection.value === "tetrahedron") {
+            th.resetparams()
         } else if (shapeselection.value === "triangular-prism") {
             tp.resetparams()
-        } else{
-            th.resetparams()
         }
     }
 
     animateswitch.checked = isAnimating;
+    shadingswitch.checked = isShading;
     let gl = getWebGLContext(canvas);
     let zh =  new ZeroHollow(gl!)
     await zh.loadfile();
-    let tp =  new TriangularPrism(gl!)
-    await tp.loadfile();
-    let th = new Tetrahedron(gl!);
+    let th = new Tetrahedron(gl!)
     await th.loadfile();
+    let tp = new TriangularPrism(gl!)
+    await tp.loadfile();
     let whatToRender = (): Shape => {
         if (shapeselection.value === "zero-hollow") {
             return zh;
+        } else if (shapeselection.value === "tetrahedron") {
+            return th;
         } else if (shapeselection.value === "triangular-prism") {
             return tp;
-        } else {
-            return th;
         }
+        return zh;
     }
-    let renderedShape = whatToRender();
     shapeselection.addEventListener("change", () => {
         resetValues();
+        zh.camMode = CameraMode.Perspective;
+        th.camMode = CameraMode.Perspective;
+        tp.camMode = CameraMode.Perspective;
+        zh.shading = isShading;
+        th.shading = isShading;
+        tp.shading = isShading;
+        camselection.value = "pers-cam-mode";
         renderedShape = whatToRender();
         reRender(gl!, [
             renderedShape
         ])
     })
+    let renderedShape = whatToRender();
+    renderedShape.shading = isShading;
     reRender(gl!, [
         renderedShape
     ])
@@ -89,9 +97,9 @@ async function init() {
         radxanim += animstep;
         radyanim += animstep;
         radzanim += animstep;
-        radxanim %= 2 * Math.PI;
-        radyanim %= 2 * Math.PI;
-        radzanim %= 2 * Math.PI;
+        radxanim = radxanim > Math.PI ? radxanim - 2*Math.PI : radxanim;
+        radyanim = radyanim > Math.PI ? radyanim - 2*Math.PI : radyanim;
+        radzanim = radzanim > Math.PI ? radzanim - 2*Math.PI : radzanim;
         reRender(gl!, [
             renderedShape
         ])
@@ -102,6 +110,14 @@ async function init() {
     animateswitch.addEventListener("change", () => {
         isAnimating = !isAnimating;
         animateswitch.checked = isAnimating;
+    })
+    shadingswitch.addEventListener("change", () => {
+        isShading = !isShading;
+        shadingswitch.checked = isShading;
+        renderedShape.shading = isShading;
+        reRender(gl!, [
+            renderedShape
+        ])
     })
     // control
     camselection.addEventListener("change", () => {
@@ -117,18 +133,7 @@ async function init() {
             renderedShape
         ])
     })
-    camxrot.addEventListener("input", () => {
-        if (renderedShape.camMode == CameraMode.Ortho) {
-            renderedShape.orthoInstance.rotxrad = camxrot.valueAsNumber * Math.PI / 180;
-        } else if (renderedShape.camMode == CameraMode.Perspective) {
-            renderedShape.perspectiveInstance.rotxrad = camxrot.valueAsNumber * Math.PI / 180;
-        } else if (renderedShape.camMode == CameraMode.Oblique) {
-            renderedShape.obliqueInstance.rotxrad = camxrot.valueAsNumber * Math.PI / 180;
-        }
-        reRender(gl!, [
-            renderedShape
-        ])
-    })
+
     camyrot.addEventListener("input", () => {
         if (renderedShape.camMode == CameraMode.Ortho) {
             renderedShape.orthoInstance.rotyrad = camyrot.valueAsNumber * Math.PI / 180;
@@ -141,18 +146,7 @@ async function init() {
             renderedShape
         ])
     })
-    camzrot.addEventListener("input", () => {
-        if (renderedShape.camMode == CameraMode.Ortho) {
-            renderedShape.orthoInstance.rotzrad = camzrot.valueAsNumber * Math.PI / 180;
-        } else if (renderedShape.camMode == CameraMode.Perspective) {
-            renderedShape.perspectiveInstance.rotzrad = camzrot.valueAsNumber * Math.PI / 180;
-        } else if (renderedShape.camMode == CameraMode.Oblique) {
-            renderedShape.obliqueInstance.rotzrad = camzrot.valueAsNumber * Math.PI / 180;
-        }
-        reRender(gl!, [
-            renderedShape
-        ])
-    })
+
     camzoom.addEventListener("input", () => {
         if (renderedShape.camMode == CameraMode.Ortho) {
             renderedShape.orthoInstance.zoom = camzoom.valueAsNumber;
