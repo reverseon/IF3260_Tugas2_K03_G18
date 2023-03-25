@@ -121,7 +121,9 @@ async function init() {
         ])
     })
     resetview.addEventListener("click", () => {
-        isAnimating = !isAnimating;
+        if (isAnimating) {
+            isAnimating = !isAnimating;
+        }
         animateswitch.checked = isAnimating;
         zh.resetparams();
         tp.resetparams();
