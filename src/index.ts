@@ -125,9 +125,7 @@ async function init() {
             isAnimating = !isAnimating;
         }
         animateswitch.checked = isAnimating;
-        zh.resetparams();
-        tp.resetparams();
-        th.resetparams();
+        resetValues()
         reRender(gl!, [
             renderedShape
         ])
