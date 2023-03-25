@@ -4,8 +4,9 @@ import {Tetrahedron, TriangularPrism, ZeroHollow} from "./model";
 import {CameraMode, Shape} from "./lib/baseClass";
 
 async function init() {
-    let isAnimating = true;
-    let isShading = true;
+    let isAnimating = false;
+    let isShading = false;
+    let isLoaded = false;
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
     let camselection = document.getElementById("cam-selection") as HTMLSelectElement;
     let shapeselection = document.getElementById("shape-selection") as HTMLSelectElement;
@@ -23,6 +24,68 @@ async function init() {
     let objyscale = document.getElementById("obj-yscale") as HTMLInputElement;
     let objzscale = document.getElementById("obj-zscale") as HTMLInputElement;
     let resetview = document.getElementById("reset-view") as HTMLInputElement;
+    let jsonfile = document.getElementById("json-file") as HTMLInputElement;
+    let downloadbtn = document.getElementById("download-btn") as HTMLButtonElement;
+    jsonfile.addEventListener("change", async () => {
+        let file = jsonfile.files![0];
+        camselection.value = "pers-cam-mode";
+        let reader = new FileReader();
+        reader.readAsText(file);
+        resetValues()
+        isAnimating = false;
+        animateswitch.checked = isAnimating;
+        isShading = false;
+        shadingswitch.checked = isShading;
+        renderedShape = null;
+        isLoaded = false;
+        reader.onload = async () => {
+            try {
+                let json = JSON.parse(reader.result as string);
+                zh = new ZeroHollow(gl!)
+                th = new Tetrahedron(gl!)
+                tp = new TriangularPrism(gl!)
+                zh.loadfile(json);
+                th.loadfile(json);
+                tp.loadfile(json);
+                isLoaded = true;
+                renderedShape = whatToRender()
+                isAnimating = true;
+                animateswitch.checked = isAnimating;
+                isShading = true;
+                shadingswitch.checked = isShading;
+                console.log(renderedShape)
+            } catch (e) {
+                console.log(e)
+                alert("Invalid JSON file");
+            }
+        }
+        reRender(gl!, [renderedShape]);
+    })
+    downloadbtn.addEventListener("click", () => {
+        if (!renderedShape) {
+            return;
+        } else {
+            let zhstr: string = zh.getTransformedVerticesJSON();
+            let thstr: string = th.getTransformedVerticesJSON();
+            let tpstr: string = tp.getTransformedVerticesJSON();
+            let zhobj = JSON.parse(zhstr);
+            let thobj = JSON.parse(thstr);
+            let tpobj = JSON.parse(tpstr);
+            let combined = {
+                ...zhobj,
+                ...thobj,
+                ...tpobj
+            }
+            let blob = new Blob([
+                JSON.stringify(combined)
+            ], {type: "text/plain;charset=utf-8"});
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement("a");
+            a.download = "transformed-vertices.json";
+            a.href = url;
+            a.click();
+        }
+    })
     let resetValues = () => {
         camyrot.valueAsNumber = 0;
         camzoom.valueAsNumber = 1;
@@ -48,12 +111,13 @@ async function init() {
     shadingswitch.checked = isShading;
     let gl = getWebGLContext(canvas);
     let zh =  new ZeroHollow(gl!)
-    await zh.loadfile();
     let th = new Tetrahedron(gl!)
-    await th.loadfile();
     let tp = new TriangularPrism(gl!)
-    await tp.loadfile();
-    let whatToRender = (): Shape => {
+    let renderedShape: Shape | null = null;
+    let whatToRender = (): Shape | null => {
+        if (!isLoaded) {
+            return null;
+        }
         if (shapeselection.value === "zero-hollow") {
             return zh;
         } else if (shapeselection.value === "tetrahedron") {
@@ -77,15 +141,13 @@ async function init() {
             renderedShape
         ])
     })
-    let renderedShape = whatToRender();
-    renderedShape.shading = isShading;
-    reRender(gl!, [
-        renderedShape
-    ])
     // animate
 
     let animstep = 0.01;
     setInterval(() => {
+        if (!renderedShape){
+            return;
+        }
         if (!isAnimating) {
             return;
         }
@@ -113,6 +175,9 @@ async function init() {
         animateswitch.checked = isAnimating;
     })
     shadingswitch.addEventListener("change", () => {
+        if (!renderedShape){
+            return;
+        }
         isShading = !isShading;
         shadingswitch.checked = isShading;
         renderedShape.shading = isShading;
@@ -132,6 +197,9 @@ async function init() {
     });
     // control
     camselection.addEventListener("change", () => {
+        if (!renderedShape){
+            return;
+        }
         resetValues();
         if (camselection.value == "pers-cam-mode") {
             renderedShape.camMode = CameraMode.Perspective;
@@ -146,6 +214,9 @@ async function init() {
     })
 
     camyrot.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         if (renderedShape.camMode == CameraMode.Ortho) {
             renderedShape.orthoInstance.rotyrad = camyrot.valueAsNumber * Math.PI / 180;
         } else if (renderedShape.camMode == CameraMode.Perspective) {
@@ -159,6 +230,9 @@ async function init() {
     })
 
     camzoom.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         if (renderedShape.camMode == CameraMode.Ortho) {
             renderedShape.orthoInstance.zoom = camzoom.valueAsNumber;
         } else if (renderedShape.camMode == CameraMode.Perspective) {
@@ -171,54 +245,81 @@ async function init() {
         ])
     })
     objxrot.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.rotxrad = objxrot.valueAsNumber * Math.PI / 180;
         reRender(gl!, [
             renderedShape
         ])
     })
     objyrot.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.rotyrad = objyrot.valueAsNumber * Math.PI / 180;
         reRender(gl!, [
             renderedShape
         ])
     })
     objzrot.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.rotzrad = objzrot.valueAsNumber * Math.PI / 180;
         reRender(gl!, [
             renderedShape
         ])
     })
     objxtrans.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.translatex = objxtrans.valueAsNumber;
         reRender(gl!, [
             renderedShape
         ])
     })
     objytrans.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.translatey = objytrans.valueAsNumber;
         reRender(gl!, [
             renderedShape
         ])
     })
     objztrans.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.translatez = objztrans.valueAsNumber;
         reRender(gl!, [
             renderedShape
         ])
     })
     objxscale.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.scalex = objxscale.valueAsNumber;
         reRender(gl!, [
             renderedShape
         ])
     })
     objyscale.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.scaley = objyscale.valueAsNumber;
         reRender(gl!, [
             renderedShape
         ])
     })
     objzscale.addEventListener("input", () => {
+        if (!renderedShape){
+            return;
+        }
         renderedShape.scalez = objzscale.valueAsNumber;
         reRender(gl!, [
             renderedShape

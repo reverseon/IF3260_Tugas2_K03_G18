@@ -47,16 +47,25 @@ class ZeroHollow extends Shape {
             )!
         );
     }
+    private getCenter(vertices: Vertex[]): Point {
+        let x = 0;
+        let y = 0;
+        let z = 0;
+        for (let i = 0; i < vertices.length; i++) {
+            x += vertices[i].position.x;
+            y += vertices[i].position.y;
+            z += vertices[i].position.z;
+        }
+        return new Point(x / vertices.length, y / vertices.length, z / vertices.length, 1);
+    }
     private hexToColor(hex: string): Color {
         let r = parseInt(hex.slice(1, 3), 16) / 255;
         let g = parseInt(hex.slice(3, 5), 16) / 255;
         let b = parseInt(hex.slice(5, 7), 16) / 255;
         return new Color(r, g, b, 1);
     }
-    async loadfile() {
-        const response = await fetch(require("./base/basemodel.json"));
-        const jsonraw = await response.json();
-        const json = jsonraw.zeroHollow
+    loadfile(jsonr: any) {
+        let json = jsonr.zeroHollow
         this.points = json.vertices.map(
             (v: any) => {
                 return new Point(v.x, v.y, v.z, 1);
@@ -66,28 +75,20 @@ class ZeroHollow extends Shape {
         this.colors = json.hexColors.map(
             (hex: string) => this.hexToColor(hex)
         )
-        let fpoint = this.points[0]
-        let lpoint = this.points[10]
-        let dx = lpoint.x - fpoint.x
-        let dy = lpoint.y - fpoint.y
-        let dz = lpoint.z - fpoint.z
-        this.center = new Point(
-            fpoint.x + dx / 2,
-            fpoint.y + dy / 2,
-            fpoint.z + dz / 2,
-            1
-        )
+        this.renderedVertices = this.createRenderedVertices();
+        this.center = this.getCenter(this.renderedVertices);
     }
-    private createRenderedVertices(): void {
-        this.renderedVertices = []
+    private createRenderedVertices(): Vertex[] {
+        let renderedVertices = []
         for (let i = 0; i < this.indices.length/6; i++) {
             for (let j = 0; j < 6; j++) {
                 let index = this.indices[i*6 + j]
                 let point = this.points[index]
                 let color = this.colors[i]
-                this.renderedVertices.push(new Vertex(point, color))
+                renderedVertices.push(new Vertex(point, color))
             }
         }
+        return renderedVertices;
     }
     private verticesToF32PointArray(vertex: Vertex[]): Float32Array {
         let array: number[] = [];
@@ -140,6 +141,76 @@ class ZeroHollow extends Shape {
         }
         return normals
     }
+    private colorToHex(color: Color): string {
+        let r = Math.round(color.r * 255).toString(16);
+        let g = Math.round(color.g * 255).toString(16);
+        let b = Math.round(color.b * 255).toString(16);
+        return "#" + r + g + b;
+    }
+    getTransformedVerticesJSON(): string {
+        let pts = this.points
+        let toOrigin = m4util.translation(
+            -this.center.x,
+            -this.center.y,
+            -this.center.z
+        );
+        let rotxmat = m4util.xRotation(this.rotxrad);
+        let rotymat = m4util.yRotation(this.rotyrad);
+        let rotzmat = m4util.zRotation(this.rotzrad);
+        let translatemat = m4util.translation(
+            this.translatex,
+            this.translatey,
+            this.translatez
+        );
+        let scalemat = m4util.scaling(
+            this.scalex,
+            this.scaley,
+            this.scalez
+        );
+        let matrix = m4util.translation(
+            this.center.x,
+            this.center.y,
+            this.center.z
+        )
+        matrix = m4util.multiply(matrix, translatemat);
+        matrix = m4util.multiply(matrix, rotxmat);
+        matrix = m4util.multiply(matrix, rotymat);
+        matrix = m4util.multiply(matrix, rotzmat);
+        matrix = m4util.multiply(matrix, scalemat);
+        matrix = m4util.multiply(matrix, toOrigin);
+        let transformedPoints: Point[] = []
+        for (let pt of pts) {
+            let numvert = m4util.matvec(matrix, [pt.x, pt.y, pt.z, pt.w])
+            transformedPoints.push(new Point(numvert[0], numvert[1], numvert[2], numvert[3]))
+        }
+        console.log(
+            "zerohollow",
+            this.translatex,
+            this.translatey,
+            this.translatez,
+            this.rotxrad,
+            this.rotyrad,
+            this.rotzrad,
+            this.scalex,
+            this.scaley,
+            this.scalez,
+            this.center,
+        )
+        let finalobj = {
+            zeroHollow: {
+                vertices: transformedPoints.map(pt => {
+                    return {
+                        x: pt.x,
+                        y: pt.y,
+                        z: pt.z
+                    }
+                }),
+                indices: this.indices,
+                hexColors: this.colors.map(color => this.colorToHex(color))
+            }
+        }
+        return JSON.stringify(finalobj)
+    }
     draw(gl: WebGLRenderingContext): void {
         gl.useProgram(this.program);
         let positionAttributeLocation = gl.getAttribLocation(this.program, "a_position");
@@ -147,7 +218,6 @@ class ZeroHollow extends Shape {
         let uMatrixLocation = gl.getUniformLocation(this.program, "u_matrix");
         let positionBuffer = gl.createBuffer();
         let colorBuffer = gl.createBuffer();
-        this.createRenderedVertices();
         let positionArray = this.verticesToF32PointArray(this.renderedVertices);
         let colorArray = this.verticesToF32ColorArray(this.renderedVertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -307,17 +377,15 @@ class TriangularPrism extends Shape {
         );
 
     }
-    async loadfile() {
-        const response = await fetch(require("./base/basemodel.json"));
-        const jsonraw = await response.json();
-        const json = jsonraw.triangularprism
+    loadfile(jsonr: any) {
+        let json = jsonr.triangularprism
         this.renderedVertices = json.vertices.map((v: any) => {
             return new Vertex(
                 new Point(v.position.x, v.position.y, v.position.z, v.position.w),
                 new Color(v.color.r, v.color.g, v.color.b, v.color.a)
             )
         })
-        this.center = new Point(json.center.x, json.center.y, json.center.z, 1);
+        this.center = this.getCenter(this.renderedVertices);
     }
     private verticesToF32ArrayPoint(vertices: Vertex[]): Float32Array {
         const f32Array = new Float32Array(vertices.length * 4);
@@ -372,7 +440,71 @@ class TriangularPrism extends Shape {
         }
         return new Float32Array(array);
     }
-
+    private getCenter(vertices: Vertex[]): Point {
+        let x = 0;
+        let y = 0;
+        let z = 0;
+        for (let i = 0; i < vertices.length; i++) {
+            x += vertices[i].position.x;
+            y += vertices[i].position.y;
+            z += vertices[i].position.z;
+        }
+        return new Point(x / vertices.length, y / vertices.length, z / vertices.length, 1);
+    }
+    getTransformedVerticesJSON(): string {
+        let vertices = this.renderedVertices
+        let toOrigin = m4util.translation(
+            -this.center.x,
+            -this.center.y,
+            -this.center.z
+        );
+        let rotxmat = m4util.xRotation(this.rotxrad);
+        let rotymat = m4util.yRotation(this.rotyrad);
+        let rotzmat = m4util.zRotation(this.rotzrad);
+        let translatemat = m4util.translation(
+            this.translatex,
+            this.translatey,
+            this.translatez
+        );
+        let scalemat = m4util.scaling(
+            this.scalex,
+            this.scaley,
+            this.scalez
+        );
+        let matrix = m4util.translation(
+            this.center.x,
+            this.center.y,
+            this.center.z
+        )
+        matrix = m4util.multiply(matrix, translatemat);
+        matrix = m4util.multiply(matrix, rotxmat);
+        matrix = m4util.multiply(matrix, rotymat);
+        matrix = m4util.multiply(matrix, rotzmat);
+        matrix = m4util.multiply(matrix, scalemat);
+        matrix = m4util.multiply(matrix, toOrigin);
+        console.log(
+            "triangular prism",
+            this.translatex,
+            this.translatey,
+            this.translatez,
+            this.rotxrad,
+            this.rotyrad,
+            this.rotzrad,
+            this.scalex,
+            this.scaley,
+            this.scalez,
+            this.center,
+        )
+        let transformedVertices: Vertex[] = []
+        for (let vertex of vertices) {
+            let numvert = m4util.matvec(matrix, [vertex.position.x, vertex.position.y, vertex.position.z, vertex.position.w])
+            transformedVertices.push(new Vertex(new Point(numvert[0], numvert[1], numvert[2], numvert[3]), vertex.color))
+        }
+        let finalobj = {triangularprism:{
+            vertices: transformedVertices,
+        }}
+        return JSON.stringify(finalobj)
+    }
     draw(gl: WebGLRenderingContext): void {
         gl.useProgram(this.program);
         let positionAttributeLocation = gl.getAttribLocation(this.program, "a_position");
@@ -394,8 +526,8 @@ class TriangularPrism extends Shape {
         let depth = 1000;
         if (this.camMode == CameraMode.Ortho) {
             this.orthoInstance.updateProjectionMatrix((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight, depth);
-            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
-            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
+            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
             this.orthoInstance.updateViewMatrix();
             matrix = m4util.multiply(this.orthoInstance.projectionMatrix, this.orthoInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Perspective) {
@@ -406,9 +538,7 @@ class TriangularPrism extends Shape {
                 1,
                 depth,
             )
-            this.perspectiveInstance.translatex = this.center.x;
-            this.perspectiveInstance.translatey = this.center.y;
-            this.perspectiveInstance.translatez = -depth/2 + this.center.z;
+            this.perspectiveInstance.translatez = -depth/2;
             this.perspectiveInstance.updateViewMatrix();
             matrix = m4util.multiply(this.perspectiveInstance.projectionMatrix, this.perspectiveInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Oblique) {
@@ -419,8 +549,8 @@ class TriangularPrism extends Shape {
                 (gl.canvas as HTMLCanvasElement).clientHeight,
                 depth,
             )
-            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
-            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
+            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
             this.obliqueInstance.updateViewMatrix();
             matrix = m4util.multiply(this.obliqueInstance.projectionMatrix, this.obliqueInstance.viewMatrix);
         }
@@ -525,16 +655,27 @@ class Tetrahedron extends Shape{
 
     }
 
-    async loadfile() {
-        const response = await fetch(require("./base/basemodel.json"));
-        const jsonraw = await response.json();
-        const json = jsonraw.tetrahedron;
+    private getCenter(vertices: Vertex[]): Point {
+        let x = 0;
+        let y = 0;
+        let z = 0;
+        for (let i = 0; i < vertices.length; i++) {
+            x += vertices[i].position.x;
+            y += vertices[i].position.y;
+            z += vertices[i].position.z;
+        }
+        return new Point(x / vertices.length, y / vertices.length, z / vertices.length, 1);
+    }
+
+    loadfile(jsonr: any) {
+        let json = jsonr.tetrahedron;
         this.renderedVertices = json.vertices.map((v: any) => {
             return new Vertex(
                 new Point(v.position.x, v.position.y, v.position.z, v.position.w),
                 new Color(v.color.r, v.color.g, v.color.b, v.color.a)
             )
         });
+        this.center = this.getCenter(this.renderedVertices);
     }
 
     private verticesToF32ArrayPoint(vertices: Vertex[]): Float32Array {
@@ -613,8 +754,8 @@ class Tetrahedron extends Shape{
         let depth = 1000;
         if (this.camMode == CameraMode.Ortho) {
             this.orthoInstance.updateProjectionMatrix((gl.canvas as HTMLCanvasElement).clientWidth, (gl.canvas as HTMLCanvasElement).clientHeight, depth);
-            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
-            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
+            this.orthoInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.orthoInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
             this.orthoInstance.updateViewMatrix();
             matrix = m4util.multiply(this.orthoInstance.projectionMatrix, this.orthoInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Perspective) {
@@ -625,9 +766,7 @@ class Tetrahedron extends Shape{
                 1,
                 depth,
             )
-            this.perspectiveInstance.translatez = -depth/2 + this.center.z;
-            this.perspectiveInstance.translatex = this.center.x;
-            this.perspectiveInstance.translatey = this.center.y;
+            this.perspectiveInstance.translatez = -depth/2;
             this.perspectiveInstance.updateViewMatrix();
             matrix = m4util.multiply(this.perspectiveInstance.projectionMatrix, this.perspectiveInstance.viewMatrix);
         } else if (this.camMode == CameraMode.Oblique) {
@@ -638,8 +777,8 @@ class Tetrahedron extends Shape{
                 (gl.canvas as HTMLCanvasElement).clientHeight,
                 depth,
             )
-            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2 + this.center.x;
-            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2 + this.center.y;
+            this.obliqueInstance.translatex = -(gl.canvas as HTMLCanvasElement).clientWidth / 2;
+            this.obliqueInstance.translatey = -(gl.canvas as HTMLCanvasElement).clientHeight / 2;
             this.obliqueInstance.updateViewMatrix();
             matrix = m4util.multiply(this.obliqueInstance.projectionMatrix, this.obliqueInstance.viewMatrix);
         }
@@ -698,6 +837,62 @@ class Tetrahedron extends Shape{
         let uShadingLocation = gl.getUniformLocation(this.program, "u_shading");
         gl.uniform1i(uShadingLocation, this.shading ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES, 0, this.renderedVertices.length)
+    }
+    getTransformedVerticesJSON(): string {
+        let vertices = this.renderedVertices
+        let toOrigin = m4util.translation(
+            -this.center.x,
+            -this.center.y,
+            -this.center.z
+        );
+        let rotxmat = m4util.xRotation(this.rotxrad);
+        let rotymat = m4util.yRotation(this.rotyrad);
+        let rotzmat = m4util.zRotation(this.rotzrad);
+        let translatemat = m4util.translation(
+            this.translatex,
+            this.translatey,
+            this.translatez
+        );
+        let scalemat = m4util.scaling(
+            this.scalex,
+            this.scaley,
+            this.scalez
+        );
+        let matrix = m4util.translation(
+            this.center.x,
+            this.center.y,
+            this.center.z
+        )
+        matrix = m4util.multiply(matrix, translatemat);
+        matrix = m4util.multiply(matrix, rotxmat);
+        matrix = m4util.multiply(matrix, rotymat);
+        matrix = m4util.multiply(matrix, rotzmat);
+        matrix = m4util.multiply(matrix, scalemat);
+        matrix = m4util.multiply(matrix, toOrigin);
+        console.log(
+            "tetra",
+            this.translatex,
+            this.translatey,
+            this.translatez,
+            this.rotxrad,
+            this.rotyrad,
+            this.rotzrad,
+            this.scalex,
+            this.scaley,
+            this.scalez,
+            this.center,
+        )
+        let transformedVertices: Vertex[] = []
+        for (let vertex of vertices) {
+            let numvert = m4util.matvec(matrix, [vertex.position.x, vertex.position.y, vertex.position.z, vertex.position.w])
+            transformedVertices.push(new Vertex(new Point(numvert[0], numvert[1], numvert[2], numvert[3]), vertex.color))
+        }
+        let finalobj = {
+            tetrahedron: {
+                vertices: transformedVertices,
+            }
+        }
+        return JSON.stringify(finalobj)
     }
 }
 

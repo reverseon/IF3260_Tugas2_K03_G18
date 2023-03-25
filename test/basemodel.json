@@ -1884,11 +1884,6 @@
     ]
   },
   "triangularprism": {
-    "center": {
-      "x": 0,
-      "y": 0,
-      "z": 115
-    },
     "vertices": [
       {
         "position": {

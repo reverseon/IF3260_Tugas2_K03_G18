@@ -58,8 +58,9 @@ abstract class Shape {
     constructor(vertices: Vertex[], program: WebGLProgram) {
         this.program = program;
     }
+    abstract getTransformedVerticesJSON(): string;
     abstract draw(gl: WebGLRenderingContext): void;
-    abstract loadfile(): void;
+    abstract loadfile(json: any): void;
     resetparams(): void {
         this.translatex = 0;
         this.translatey = 0;
