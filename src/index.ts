@@ -22,6 +22,7 @@ async function init() {
     let objxscale = document.getElementById("obj-xscale") as HTMLInputElement;
     let objyscale = document.getElementById("obj-yscale") as HTMLInputElement;
     let objzscale = document.getElementById("obj-zscale") as HTMLInputElement;
+    let resetview = document.getElementById("reset-view") as HTMLInputElement;
     let resetValues = () => {
         camyrot.valueAsNumber = 0;
         camzoom.valueAsNumber = 1;
@@ -119,6 +120,16 @@ async function init() {
             renderedShape
         ])
     })
+    resetview.addEventListener("click", () => {
+        isAnimating = !isAnimating;
+        animateswitch.checked = isAnimating;
+        zh.resetparams();
+        tp.resetparams();
+        th.resetparams();
+        reRender(gl!, [
+            renderedShape
+        ])
+    });
     // control
     camselection.addEventListener("change", () => {
         resetValues();
