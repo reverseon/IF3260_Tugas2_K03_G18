@@ -26,6 +26,11 @@ async function init() {
     let resetview = document.getElementById("reset-view") as HTMLInputElement;
     let jsonfile = document.getElementById("json-file") as HTMLInputElement;
     let downloadbtn = document.getElementById("download-btn") as HTMLButtonElement;
+    let showhelp = document.getElementById("show-help") as HTMLButtonElement;
+    let rowhelper = document.getElementById("row-helper") as HTMLDivElement;
+    showhelp.addEventListener("click", () => {
+        rowhelper.classList.toggle("d-none");
+    })
     jsonfile.addEventListener("change", async () => {
         let file = jsonfile.files![0];
         camselection.value = "pers-cam-mode";

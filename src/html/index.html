@@ -9,8 +9,54 @@
 <body>
     <div class="container mt-5">
         <div class="row">
-            <h1 class="fit-content mx-auto">Tubes 2 Grafkom</h1>
+            <div class="col-12">
+                <h1 class="fit-content mx-auto">Tubes 2 Grafkom</h1>
+            </div>
         </div>
+        <div class="row mt-3">
+            <div class="container border border-dark rounded border-2">
+                <div class="row">
+                    <div class="col-12">
+                        <button type="button" class="btn btn-warning btn-sm my-3 mx-auto" id="show-help">Show Help</button>
+                    </div>
+                </div>
+                <div class="row mb-3 d-none" id="row-helper">
+                    <div class="col-12">
+                        <h6>1. Melakukan Load Model</h6>
+                        Pilihlah tombol "Choose File" pada controller di bagian kanan. Selanjutnya, pilih file JSON konfigurasi model yang ingin di-load. Contoh file konfigurasi model dalam JSON ada pada folder test. Setelah model di-load, animasi akan otomatis aktif.
+                    </div>
+                    <div class="col-12 mt-3">
+                        <h6>2. Mengganti Shape</h6>
+                        Shape yang tampil di canvas dapat diganti dengan memilih dropdown model pada controller bagian "Shape and Camera Mode". Terdapat 3 shape yang dapat dipilih, yaitu Zero Hollow, TetraHedron, dan Triangular Prism.
+                    </div>
+                    <div class="col-12 mt-3">
+                        <h6>3. Mengganti Jenis Proyeksi</h6>
+                        Jenis proyeksi shape dapat diganti dengan memilih dropdown proyeksi pada controller bagian "Shape and Camera Mode". Terdapat 3 shape yang dapat dipilih, yaitu Zero Hollow, TetraHedron, dan Triangular Prism.
+                    </div>
+                    <div class="col-12 mt-3">
+                        <h6>4. Melakukan Reset View</h6>
+                        Anda dapat melakukan reset ke default view untuk semua model dengan menekan tombol "Reset". Setelah itu, animasi akan nonaktif serta semua parameter kontrol (translasi, rotasi, dll) akan kembali ke default.
+                    </div>
+                    <div class="col-12 mt-3">
+                        <h6>5. Animasi</h6>
+                        Animasi dapat diaktifkan dan dinonaktifkan melalui switch "Animate" yang ada pada controller sebelah kanan
+                    </div>
+                    <div class="col-12 mt-3">
+                        <h6>6. Shading</h6>
+                        Shading dapat diaktifkan dan dinonaktifkan melalui switch "Shading" yang ada pada controller sebelah kanan
+                    </div>
+                    <div class="col-12 mt-3">
+                        <h6>7. Kontrol Kamera</h6>
+                        Kamera dapat dikontrol dengan melakukan zoom atau rotasi terhadap sumbu Y. Hal ini dapat dilakukan dengan menggunakan slider yang ada pada controller bagian "Camera Control" di sebelah kanan.
+                    </div>
+                    <div class="col-12 mt-3">
+                        <h6>8. Kontrol Objek</h6>
+                        Anda dapat melakukan rotasi, translasi, dan melakukan perubahan skala terhadap sumbu x, y, dan z pada objek. Hal ini dapat dilakukan menggunakan slider yang ada pada controller bagian "Object Control" di sebelah kanan.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row mt-3">
             <div class="col-9">
                 <canvas id="canvas" class="border border-dark rounded border-2" width="700" height="500"></canvas>

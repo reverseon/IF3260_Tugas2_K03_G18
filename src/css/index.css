@@ -5,7 +5,6 @@ html {
 
 *, *:before, *:after {
     box-sizing: border-box !important;
-    white-space: nowrap !important;
 }
 
 .fit-content {
@@ -18,4 +17,7 @@ canvas {
 
 hr {
     margin-top: 0 !important;
+}
+.d-none {
+    display: none !important;
 }
